@@ -1,9 +1,8 @@
 # QuickRag
 
-# QuickRag
 
 <p align="center">
-    <img src="/home/pepito/Images/Captures d’écran/qr.png" width="120" alt="QuickRag Logo">
+    <img src="assets/qr.png" width="120" alt="QuickRag Logo">
     <br>
     <img src="https://img.shields.io/badge/🐍Python-3.12-00d9ff?style=for-the-badge&logo=python&logoColor=white&labelColor=1a1a2e">
     <a href="https://github.com/ton_compte/QuickRag">
