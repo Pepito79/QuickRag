@@ -1,0 +1,31 @@
+# Pycache
+__pycache__/
+*.pyc
+
+# Build metadata
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Package builds
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+.env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+
