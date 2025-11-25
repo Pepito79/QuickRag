@@ -65,13 +65,14 @@ class  VectorStore:
                 name= collection_name,
                 embedding_function=self.embedding_model
             )
+            print("Collection created successfully !")
+            return  collection
 
         except Exception as e:
             print("Exception raised\n",e)
-            return
+
         
-        print("Collection created successfully !")
-        return  collection
+
     
     def delete_collection(self,
                           collection_name:str):
@@ -134,7 +135,7 @@ class  VectorStore:
     def add_doc_to_collection(self,
                               docs: list[Document],
                               collection: Collection 
-                              ):
+                              ) :
         
         """
         Add only the documents that are not present to a collection. 
@@ -167,7 +168,8 @@ class  VectorStore:
                     ids = ids_to_add,
                     documents = [doc.page_content for doc in doc_to_add]
                 )
-                return collection
+                
+                print("Documents successfully added to the collection")
             except Exception as e:
                 print(" Error while adding documents to the collection : ",e)
         
@@ -175,4 +177,27 @@ class  VectorStore:
             print("Nothing to add the collection already contains all the documents")
         
         
+    def retrieve_docs(self,
+                    query:str,
+                    collection : Collection,
+                    top_k:int = 5):
+    
+        
+        
+        embedded_query = self.embedding_model.embed_query(query)
+        try:
+            docs = collection.query(
+                query_embeddings = embedded_query,
+                n_results = top_k
+            )
+            return docs["documents"]
+        except Exception as e:
+            print("Error while retrieving docs from the collection : ",e)
+        
+    
+    
+    
+    
+    
+    
     
