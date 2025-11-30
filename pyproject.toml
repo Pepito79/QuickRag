@@ -3,7 +3,8 @@ name = "quickrag"
 version = "0.1.0"
 description = "A simple package to create RAG workflows"
 readme = "README.md"
-license = { text = "MIT" }
+# OPTIMISATION 1: Simplification de la licence (évite le warning de dépréciation)
+license = "MIT" 
 requires-python = ">=3.12"
 dependencies = [
     "pytest>=9.0.1",
@@ -20,3 +21,7 @@ dependencies = [
 [build-system]
 requires = ["setuptools>=42","wheel"]
 build-backend = "setuptools.build_meta"
+
+# OPTIMISATION 2: Configuration pour le 'src-layout'
+[tool.setuptools.packages.find]
+where = ["src"]
