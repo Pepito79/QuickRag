@@ -15,6 +15,7 @@
 
 QuickRag is an open-source toolkit for **Retrieval-Augmented Generation (RAG)**.  
 It combines document indexing, retrieval, optional reranking, and querying large language models (LLMs) like Gemini.
+
 ---
 
 ## 🚀 Quick Start
@@ -32,7 +33,7 @@ source .venv/bin/activate  # Linux / Mac
 # install dependencies
 pip install -r requirements.txt
 pip install -e .            # editable install for development
-
+```
 
 ---
 
