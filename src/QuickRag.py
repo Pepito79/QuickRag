@@ -7,7 +7,7 @@ from langchain_classic.prompts import ChatPromptTemplate
 import uuid
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
-from Reranker import Reranker
+from Reranker import Rerankers
 from utils.loader import load_pdf_docs
 
 import os
@@ -84,7 +84,7 @@ class QuickRag:
         path_documents: str,
         query: str,
         gemini_model: str,
-        reranker: Reranker | None = None,
+        reranker: Rerankers | None = None,
         collection_name: str | None = None,
         path_db: str = "./chromadb",
     ):
@@ -94,7 +94,7 @@ class QuickRag:
             path_documents (str): the documents path
             query (str): user's query
             gemini_model (str): the gemini model
-            reranker (Reranker | None, optional): An optionnal reranker to have better result. Defaults to None.
+            reranker (Rerankers | None, optional): An optionnal reranker to have better result. Defaults to None.
             collection_name (str | None, optional): name of the collection to create. Defaults to None.
             path_db (str, optional): _description_. path where to store the db to "./chromadb".
 

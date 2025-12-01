@@ -6,6 +6,7 @@ from utils.hash_functions import generate_ids
 from utils.api_key_verifier import verify_gemini_key
 from utils.gemini import get_answer_gemini
 from langchain_core.documents import Document
+from Reranker import Rerankers
 
 
 # A util function that allows us to load and split the documents
@@ -139,6 +140,7 @@ class ColbertRAG:
         self,
         query: str,
         index_path: str,
+        reranker: Rerankers | None = None,
         top_k: int = 5,
         gemini_model: str = "gemini-2.5-flash",
     ) -> str:
@@ -156,15 +158,18 @@ class ColbertRAG:
         # Verify if the user has a gemini key in his env
         verify_gemini_key()
 
-        # Load the retriever and use it as a langchain retriever
-        retriever = self.colbert_model.from_index(
-            index_path=index_path, verbose=1
-        ).as_langchain_retriever(k=top_k)
+        # Use the reranker if it is given
+        if reranker is not None:
+            retrieved_docs = self.retrieve_docs(query, index_path, top_k)
+            ranked_docs = reranker.rank_docs(query=query, docs=retrieved_docs)
+            context = ranked_docs
 
-        # Get the retrieved docs
-        retrieved_docs = retriever.invoke(query)
+        # If no reranker used
+        else:
+            # Get the retrieved docs
+            context = self.retrieve_docs(query, index_path, top_k)
 
-        answer = get_answer_gemini(model=gemini_model, query=query, docs=retrieved_docs)
+        answer = get_answer_gemini(model=gemini_model, query=query, docs=context)
 
         print(answer)
         return answer

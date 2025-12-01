@@ -4,16 +4,15 @@ from abc import ABC, abstractmethod
 from ragatouille import RAGPretrainedModel
 
 
-class RerankerInterface(ABC):
+class Rerankers(ABC):
 
     @abstractmethod
-    def rank_docs(self, query: str, docs: list[str], top_k: int = 5) -> list[str]:
+    def rank_docs(self, query: str, docs: list[str]) -> list[str]:
         """Rank the documents
 
         Args:
             query (str): the user query
             docs (list[str]): the docs to ranks
-            top_k (int, optional): number of docs to keep. Defaults to 5
 
         Returns:
             list[str]: the content of the document ranked
@@ -22,7 +21,7 @@ class RerankerInterface(ABC):
         pass
 
 
-class Reranker(RerankerInterface):
+class Reranker(Rerankers):
     """Class of a classic reranker with a crossEncoder model"""
 
     def __init__(
@@ -59,7 +58,7 @@ class Reranker(RerankerInterface):
         return ranked_text
 
 
-class ColbertReranker(RerankerInterface):
+class ColbertReranker(Rerankers):
     """Class that uses a Colbert model to rerank documents"""
 
     def __init__(self, top_k: int = 5, colbertModel: str = "colbert-ir/colbertv2.0"):
