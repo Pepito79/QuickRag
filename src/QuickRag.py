@@ -1,5 +1,4 @@
 from langchain_core.documents import Document
-from transformers import AutoTokenizer
 from utils.spliter import split_docs
 from langchain_google_genai import ChatGoogleGenerativeAI
 from VectorStore import VectorStore
@@ -9,7 +8,6 @@ import uuid
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from Reranker import Reranker
-from ragatouille import RAGPretrainedModel
 from utils.loader import load_pdf_docs
 
 import os
@@ -31,6 +29,7 @@ class QuickRag:
         self,
         query: str,
         gemini_model: str,
+        reranker: bool,
         retrieved_docs: list[list],
     ):
 
@@ -47,15 +46,23 @@ class QuickRag:
            Question: {question}
            """
 
-        prompt = ChatPromptTemplate.from_template(prompt=template)
+        prompt = ChatPromptTemplate.from_template(template)
         prompt_runnable = RunnableLambda(
             lambda args: prompt.format_messages(
                 context=args["context"], question=args["question"]
             )
         )
-        context_runnable = RunnableLambda(
-            lambda _: "\n\n".join(doc[0] for doc in retrieved_docs)
-        )
+
+        # Verify if we using a reranker
+        if reranker:
+            context_runnable = RunnableLambda(
+                lambda _: "\n\n".join(doc for doc in retrieved_docs)
+            )
+        else:
+            context_runnable = RunnableLambda(
+                lambda _: "\n\n".join(doc for doc in retrieved_docs)
+            )
+
         query_runnable = RunnablePassthrough()
         llm = ChatGoogleGenerativeAI(
             model=gemini_model,
@@ -81,6 +88,19 @@ class QuickRag:
         collection_name: str | None = None,
         path_db: str = "./chromadb",
     ):
+        """Create a the easiest rag that use gemini and where you can use a reranker
+
+        Args:
+            path_documents (str): the documents path
+            query (str): user's query
+            gemini_model (str): the gemini model
+            reranker (Reranker | None, optional): An optionnal reranker to have better result. Defaults to None.
+            collection_name (str | None, optional): name of the collection to create. Defaults to None.
+            path_db (str, optional): _description_. path where to store the db to "./chromadb".
+
+        Returns:
+            _type_: _description_
+        """
 
         # Verify if the gemini api key is in the .env
         verify_gemini_key()
@@ -145,8 +165,9 @@ class QuickRag:
                 doc_text for doc in retrieved_docs for doc_text in doc
             ]
 
+            # Ranks the texts
             reranked_doc = reranker.rank_docs(
-                query=query, docs=documents_in_retrieves_docs, top_k=4
+                query=query, docs=documents_in_retrieves_docs
             )
 
             context = reranked_doc
@@ -155,7 +176,10 @@ class QuickRag:
             context = retrieved_docs
 
         answer = self.get_answer_gemini(
-            query=query, gemini_model=gemini_model, retrieved_docs=context
+            query=query,
+            gemini_model=gemini_model,
+            retrieved_docs=context,
+            reranker=True,
         )
 
         return answer

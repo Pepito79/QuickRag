@@ -1,34 +1,86 @@
 from sentence_transformers import CrossEncoder
 from langchain_core.documents import Document
+from abc import ABC, abstractmethod
+from ragatouille import RAGPretrainedModel
 
-class Reranker:
-    
-    
-    def __init__(self,
-                 model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
-                 ):
-        
+
+class RerankerInterface(ABC):
+
+    @abstractmethod
+    def rank_docs(self, query: str, docs: list[str], top_k: int = 5) -> list[str]:
+        """Rank the documents
+
+        Args:
+            query (str): the user query
+            docs (list[str]): the docs to ranks
+            top_k (int, optional): number of docs to keep. Defaults to 5
+
+        Returns:
+            list[str]: the content of the document ranked
+        """
+
+        pass
+
+
+class Reranker(RerankerInterface):
+    """Class of a classic reranker with a crossEncoder model"""
+
+    def __init__(
+        self,
+        top_k: int = 5,
+        model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    ):
+
         self.cross_encoder = CrossEncoder(model)
-        
-        
-    def rank_docs(self,
-                  query: str,
-                  docs: list[str],
-                  top_k: int = 5):
-        
-        
-        # Examine all the possible issues
+        self.top_k = top_k
+
+    def rank_docs(
+        self,
+        query: str,
+        docs: list[str],
+    ) -> list[str]:
+
+        # Verify that the user gives a query and list of docs
         if query is None:
-            raise ValueError('No query has been given')
+            raise ValueError("No query has been given")
         if docs is None:
-            raise ValueError('No documents have been given')
-        if len(docs) == 0 :
-            raise ValueError('The list of documents is empty ')
-        
+            raise ValueError("No documents have been given")
+        if len(docs) == 0:
+            raise ValueError("The list of documents is empty ")
+
+        ranked_text = []
         try:
-            ranked_docs = self.cross_encoder.rank(query,docs,top_k)
+            # Rank the docs
+            ranked_docs = self.cross_encoder.rank(query, docs, self.top_k)
+            # Extract the ranked text because .rank outputs a list of dict
+            ranked_text = [docs[v["corpus_id"]] for v in ranked_docs]
         except Exception as e:
-            print('Exception raised while trying to rank the documents :\n',e)
-        return ranked_docs
-        
-        
+            print("Exception raised while trying to rank the documents :\n", e)
+        return ranked_text
+
+
+class ColbertReranker(RerankerInterface):
+    """Class that uses a Colbert model to rerank documents"""
+
+    def __init__(self, top_k: int = 5, colbertModel: str = "colbert-ir/colbertv2.0"):
+
+        self.top_k = top_k
+        self.colbertModel = RAGPretrainedModel.from_pretrained(colbertModel, -1, 0)
+
+    def rank_docs(self, query, docs):
+
+        # Verify that the user gives a query and list of docs
+        if not query:
+            raise ValueError("No query has been given")
+        if not docs:
+            raise ValueError("No query has been given")
+
+        ranked_text = []
+        try:
+            ranked_docs = self.colbertModel.rerank(
+                query=query, documents=docs, k=self.top_k, zero_index_ranks=True
+            )
+            ranked_text = [doc["content"] for doc in ranked_docs]
+            return ranked_text
+        except Exception as e:
+            print("Exception raised while trying to rank the documents :\n", e)

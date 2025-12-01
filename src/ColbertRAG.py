@@ -5,6 +5,7 @@ from utils.spliter import split_docs
 from utils.hash_functions import generate_ids
 from utils.api_key_verifier import verify_gemini_key
 from utils.gemini import get_answer_gemini
+from langchain_core.documents import Document
 
 
 # A util function that allows us to load and split the documents
@@ -107,20 +108,58 @@ class ColbertRAG:
                 "Exception raised while trying to add docs to the index\n", e
             )
 
+    def retrieve_docs(
+        self, query: str, index_path: str, top_k: int = 5
+    ) -> list[Document]:
+        """Retreves the documents from an index
+
+        Args:
+            query (str): the user query
+            index_path (str): the index path
+            top_k (int, optional): the top_k documents to keep. Defaults to 5._
+
+        Returns:
+            list[Document]: list of documents retrieved
+        """
+
+        # Verify if the index path exists
+        if not os.path.exists(index_path):
+            raise ValueError("The index path does not exists")
+        try:
+            retriever = self.colbert_model.from_index(
+                index_path=index_path, n_gpu=-1, verbose=0
+            ).as_langchain_retriever(k=top_k)
+        except Exception as e:
+            raise Exception("Exception raised while trying to retrieve the documents")
+
+        retrieved_docs = retriever.invoke(query)
+        return retrieved_docs
+
     def query(
         self,
         query: str,
         index_path: str,
+        top_k: int = 5,
         gemini_model: str = "gemini-2.5-flash",
-    ):
+    ) -> str:
+        """Query your documents using late interaction with Colbert
 
+        Args:
+            query (str): the query
+            index_path (str): the path to your exisiting index
+            top_k (int, optional): How many documents you want to retrieve. Defaults to 5.
+            gemini_model (str, optional): the Gemini model . Defaults to "gemini-2.5-flash".
+
+        Returns:
+            str: the answer of the llm
+        """
         # Verify if the user has a gemini key in his env
         verify_gemini_key()
 
         # Load the retriever and use it as a langchain retriever
         retriever = self.colbert_model.from_index(
             index_path=index_path, verbose=1
-        ).as_langchain_retriever(k=5)
+        ).as_langchain_retriever(k=top_k)
 
         # Get the retrieved docs
         retrieved_docs = retriever.invoke(query)
