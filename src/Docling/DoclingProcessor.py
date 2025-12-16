@@ -109,7 +109,7 @@ class DoclingProcessor:
             print("************Processing shut*****************\n")
             cool_chunks = generate_cool_chunks(chunks=docs)
             print(
-                f"==== Work finished : {len(cool_chunks)}cool chunks generated ======="
+                f"==== Work finished : {len(cool_chunks)} CoolChunk generated ======="
             )
             return cool_chunks
         except Exception as e:

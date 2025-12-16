@@ -23,6 +23,7 @@ class VectorStore:
         self,
         db_name: str,
         persistent_dir: str = "./chromDB",
+        embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     ):
         """
         Initialize the vector store .
@@ -36,13 +37,16 @@ class VectorStore:
         self.dir = persistent_dir
         self.chromaDB = PersistentClient(path=persistent_dir)
         self.db_name = db_name
-        self.embedding_model_name = "sentence-transformers/all-MiniLM-L6-v2"
-        self.embedding_model = create_langchain_embedding(
-            HuggingFaceEmbeddings(model_name=self.embedding_model_name)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.embedding_function = create_langchain_embedding(
+            HuggingFaceEmbeddings(
+                model_name=embedding_model, model_kwargs={"device": device}
+            )
         )
 
     def create_collection(
-        self, collection_name: str, embedding_model_name: Optional[str] = None
+        self,
+        collection_name: str,
     ) -> Collection:
         """
         If the collection is not in the db it creates one with an embedding model coming from langchain
@@ -52,25 +56,10 @@ class VectorStore:
             Collection
         """
 
-        # # If the user does not give any embedding model we use the default one of chroma
-        # if embedding_model_name is None:
-        #     self.embedding_model_name = "sentence-transformers/all-MiniLM-L6-v2"
-
-        # self.embedding_model_name = embedding_model_name
-        # # Find the available device
-        # if torch.cuda.is_available():
-        #     args = {"device": "cuda"}
-        # else:
-        #     args = {"device": "cpu"}
-
-        # self.embedding_model = create_langchain_embedding(
-        #     HuggingFaceEmbeddings(model_name=self.embedding_model_name)
-        # )
-
         # Create the collection
         try:
             collection = self.chromaDB.get_or_create_collection(
-                name=collection_name, embedding_function=self.embedding_model
+                name=collection_name, embedding_function=self.embedding_function
             )
             print("Collection created successfully !")
             return collection
@@ -106,7 +95,10 @@ class VectorStore:
         Returns:
             Collection
         """
-        return self.chromaDB.get_collection(name=collection_name)
+
+        return self.chromaDB.get_collection(
+            name=collection_name, embedding_function=self.embedding_function
+        )
 
     def collection_exists(self, collection_name: str) -> bool:
         """Verify if a collection exists in vector store db
@@ -198,7 +190,7 @@ class VectorStore:
             list: list of list that contains relevant text
         """
 
-        embedded_query = self.embedding_model.embed_query(query)
+        embedded_query = self.embedding_function.embed_query(query)
         try:
             docs = collection.query(query_embeddings=embedded_query, n_results=top_k)
             return docs["documents"]
@@ -214,7 +206,7 @@ class VectorStore:
             list: list of list that contains relevant text
         """
 
-        embedded_query = self.embedding_model.embed_query(query)
+        embedded_query = self.embedding_function.embed_query(query)
         try:
             docs = collection.query(query_embeddings=embedded_query, n_results=top_k)
             return {"texts": docs["documents"], "metadata": docs["metadatas"]}

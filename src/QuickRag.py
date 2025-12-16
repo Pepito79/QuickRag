@@ -31,7 +31,6 @@ class QuickRag:
         self,
         query: str,
         gemini_model: str,
-        reranker: bool,
         retrieved_docs: list[list],
     ):
 
@@ -55,15 +54,9 @@ class QuickRag:
             )
         )
 
-        # Verify if we using a reranker
-        if reranker:
-            context_runnable = RunnableLambda(
-                lambda _: "\n\n".join(doc for doc in retrieved_docs)
-            )
-        else:
-            context_runnable = RunnableLambda(
-                lambda _: "\n\n".join(doc for doc in retrieved_docs)
-            )
+        context_runnable = RunnableLambda(
+            lambda _: "\n\n".join(doc for doc in retrieved_docs)
+        )
 
         query_runnable = RunnablePassthrough()
         llm = ChatGoogleGenerativeAI(
@@ -89,7 +82,7 @@ class QuickRag:
         useDocling: bool = True,
         useVLM: bool = False,
         useOCR: bool = False,
-        highlight: bool = True,
+        highlight: bool = False,
         reranker: Rerankers | None = None,
         collection_name: str | None = None,
         path_db: str = "./chromadb",
@@ -125,60 +118,53 @@ class QuickRag:
         db_name = str(uuid.uuid4())
 
         # Create the vector store database
-        try:
-            db = VectorStore(db_name, path_db)
-            if os.path.exists(path_db):
-                print("Vector database already exists ...\n ")
-            else:
-                print("Vector database successfully created ...\n")
-        except Exception as e:
-            print("Exception raised while trying to create the vector database : ", e)
+        db = VectorStore(db_name, path_db)
+        print("Database successfully initialized")
+        if os.path.exists(path_db):
+            print("Vector database already exists ...\n ")
+        else:
+            print("Vector database successfully created ...\n")
 
         # Case without docling
         if not useDocling:
-            # Load the documents
             try:
                 docs = load_pdf_docs(path_documents)
             except Exception as e:
-                print("Exception raised while trying to load the documents : ", e)
+                raise RuntimeError(
+                    f"Failed to load documents from {path_documents}"
+                ) from e
 
-            # Chunk the documents
+            if not docs:
+                raise ValueError("No documents were loaded")
+
             try:
                 chunks = split_docs(self.tokenizer_model, docs, 512)
-                print("Documents succesfully chunked ...\n ")
-
+                print("Documents successfully chunked\n")
             except Exception as e:
-                print("Exception raised while trying to chunks the documents : ", e)
+                raise RuntimeError("Failed to split documents into chunks") from e
 
-        # Case with docling
         else:
             try:
                 docling_processor = DoclingProcessor(
-                    paths=path_documents, useOCR=useOCR, useSmolVLM=useVLM
+                    paths=path_documents,
+                    useOCR=useOCR,
+                    useSmolVLM=useVLM,
                 )
                 chunks = docling_processor.process()
-
             except Exception as e:
-                print(
-                    "Exception raised while trying to chunks the documents with Docling: ",
-                    e,
-                )
-        # Create or get the collection if it already exists
-        emb_model = "intfloat/multilingual-e5-small"
-        try:
-            if db.collection_exists(col_name):
-                print(
-                    f"The collection {col_name} already exists nothing will be created ....\n"
-                )
-                collection = db.get_collection(col_name)
-            else:
-                collection = db.create_collection(
-                    collection_name=col_name, embedding_model_name=emb_model
-                )
-                print(f"Collection {col_name} successfully created ....\n")
+                raise RuntimeError("Docling processing failed\n", e) from e
 
-        except Exception as e:
-            print("Exception raised while trying to create/get the collection : ", e)
+            if not chunks:
+                raise ValueError("Docling returned no chunks")
+
+        if db.collection_exists(col_name):
+            print(
+                f"The collection {col_name} already exists nothing will be created ....\n"
+            )
+            collection = db.get_collection(col_name)
+        else:
+            collection = db.create_collection(collection_name=col_name)
+            print(f"Collection {col_name} successfully created ....\n")
 
         # Add the documents to the collection
         db.add_doc_to_collection(chunks, collection)
@@ -216,11 +202,11 @@ class QuickRag:
         else:
             context = retrieved_text
 
+        if isinstance(context[0], list):
+            context = [d for sub in context for d in sub]
+
         answer = self.get_answer_gemini(
-            query=query,
-            gemini_model=gemini_model,
-            retrieved_docs=context,
-            reranker=True if reranker is None else False,
+            query=query, gemini_model=gemini_model, retrieved_docs=context
         )
 
         if highlight:
