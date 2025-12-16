@@ -5,10 +5,12 @@ from langchain_core.documents import Document
 from typing import Optional
 from langchain_huggingface import HuggingFaceEmbeddings
 from utils.hash_functions import generate_ids
+from datamodel.CoolChunk import CoolChunk
 import torch
 from chromadb.utils.embedding_functions.chroma_langchain_embedding_function import (
     create_langchain_embedding,
 )
+import json
 
 
 class VectorStore:
@@ -34,6 +36,10 @@ class VectorStore:
         self.dir = persistent_dir
         self.chromaDB = PersistentClient(path=persistent_dir)
         self.db_name = db_name
+        self.embedding_model_name = "sentence-transformers/all-MiniLM-L6-v2"
+        self.embedding_model = create_langchain_embedding(
+            HuggingFaceEmbeddings(model_name=self.embedding_model_name)
+        )
 
     def create_collection(
         self, collection_name: str, embedding_model_name: Optional[str] = None
@@ -46,21 +52,20 @@ class VectorStore:
             Collection
         """
 
-        # If the user does not give any embedding model we use the default one of chroma
-        if embedding_model_name is None:
-            self.embedding_model = None
+        # # If the user does not give any embedding model we use the default one of chroma
+        # if embedding_model_name is None:
+        #     self.embedding_model_name = "sentence-transformers/all-MiniLM-L6-v2"
 
-        # Pull the model from HuggingFace
-        else:
+        # self.embedding_model_name = embedding_model_name
+        # # Find the available device
+        # if torch.cuda.is_available():
+        #     args = {"device": "cuda"}
+        # else:
+        #     args = {"device": "cpu"}
 
-            # Find the available device
-            if torch.cuda.is_available():
-                args = {"device": "cuda"}
-            else:
-                args = {"device": "cpu"}
-            self.embedding_model = create_langchain_embedding(
-                HuggingFaceEmbeddings(model_name=embedding_model_name)
-            )
+        # self.embedding_model = create_langchain_embedding(
+        #     HuggingFaceEmbeddings(model_name=self.embedding_model_name)
+        # )
 
         # Create the collection
         try:
@@ -122,7 +127,9 @@ class VectorStore:
         else:
             return False
 
-    def add_doc_to_collection(self, docs: list[Document], collection: Collection):
+    def add_doc_to_collection(
+        self, docs: list[Document] | list[CoolChunk], collection: Collection
+    ):
         """
         Add only the documents that are not present to a collection.
 
@@ -131,6 +138,15 @@ class VectorStore:
         """
         if docs is None:
             raise ValueError("No docs have been detected")
+
+        # Verify if the user is using a docling processor or a classical one
+        _using_docling = False
+        if isinstance(docs[0], CoolChunk):
+            _using_docling = True
+            print("===== You are using Docling and some CoolChunks =====")
+
+        if isinstance(docs[0], Document):
+            print("===== You are using a langchain loader and chunker =====")
 
         # Unique ids
         ids = generate_ids(docs)
@@ -147,9 +163,26 @@ class VectorStore:
         # Verify if there are documents to add
         if len(doc_to_add) > 0:
             try:
-                collection.add(
-                    ids=ids_to_add, documents=[doc.page_content for doc in doc_to_add]
-                )
+                if _using_docling:
+
+                    # We need to serialize the metadas to string because chroma does not support lists
+                    collection.add(
+                        ids=ids_to_add,
+                        documents=[doc.contextualized_chunk for doc in doc_to_add],
+                        metadatas=[
+                            {
+                                "bboxes": json.dumps(d.bboxes),
+                                "n_pages": json.dumps(d.n_pages),
+                                "file_origin": d.origin,
+                            }
+                            for d in doc_to_add
+                        ],
+                    )
+                else:
+                    collection.add(
+                        ids=ids_to_add,
+                        documents=[doc.page_content for doc in doc_to_add],
+                    )
 
                 print("Documents successfully added to the collection")
             except Exception as e:
@@ -169,5 +202,21 @@ class VectorStore:
         try:
             docs = collection.query(query_embeddings=embedded_query, n_results=top_k)
             return docs["documents"]
+        except Exception as e:
+            print("Error while retrieving docs from the collection : ", e)
+
+    def retrieve_docs_with_metadata(
+        self, query: str, collection: Collection, top_k: int = 5
+    ) -> dict:
+        """Retrieves top_k documents from your collection that are in relation to the query
+            with metadata
+        Returns:
+            list: list of list that contains relevant text
+        """
+
+        embedded_query = self.embedding_model.embed_query(query)
+        try:
+            docs = collection.query(query_embeddings=embedded_query, n_results=top_k)
+            return {"texts": docs["documents"], "metadata": docs["metadatas"]}
         except Exception as e:
             print("Error while retrieving docs from the collection : ", e)

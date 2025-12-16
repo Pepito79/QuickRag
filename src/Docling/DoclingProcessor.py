@@ -2,7 +2,7 @@ from langchain_docling import DoclingLoader
 from typing import Iterable
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions
-from docling.datamodel.pipeline_options import smolvlm_picture_description, piep
+from docling.datamodel.pipeline_options import smolvlm_picture_description
 from docling.datamodel.base_models import InputFormat
 from docling.chunking import HybridChunker
 from docling_core.transforms.serializer.common import create_ser_result
@@ -16,7 +16,7 @@ from docling_core.transforms.serializer.markdown import (
 )
 from docling_core.types.doc.document import PictureDescriptionData
 from typing_extensions import override
-from ..utils.generate_cool_chunks import generate_cool_chunks
+from utils.generate_cool_chunks import generate_cool_chunks
 
 
 # Here we define a custom picture serialization strategy which leverages picture annotations
@@ -93,19 +93,24 @@ class DoclingProcessor:
         )
 
     def process(self):
-
+        """Process the documents and create a list of CoolChunks to have access to some metadata
+        Returns:
+            list[CoolChunks ]: list of coolchunks obtained
+        """
+        # Create a list of cool chunks that contains text and metada
         try:
             loader = DoclingLoader(
-                paths=self._paths,
+                file_path=self._paths,
                 converter=self._converter,
             )
 
             docs = loader.load()
-            print("====== GENERATING YOUR COOL CHUNKS =======")
+            print("====== GENERATING YOUR COOL CHUNKS =======\n")
+            print("************Processing shut*****************\n")
             cool_chunks = generate_cool_chunks(chunks=docs)
+            print(
+                f"==== Work finished : {len(cool_chunks)}cool chunks generated ======="
+            )
             return cool_chunks
         except Exception as e:
             raise Exception(f"There is an error while trying to load your docs:\{e}")
-
-    def set_attributes(self):
-        pass
